@@ -3,7 +3,16 @@
 Overview
 ========
 
-In this workshop you will learn how to set-up the core AWS networking without needing a deep background in networking.
+In this workshop you will learn how to set-up most of the AWS Networking Resources
+
+
+The workshop is broken up into the five modules below:
+
+1.	[Core AWS Networking](ModuleOneCore.md)
+2.	[Elastic Load Balancers](ModuleTwoELB.md)
+3.	[VPN Gateway](ModuleThreeVPN.md)
+4.	[VPC Peering](ModuleFourPeering.md)
+5.	[TransitGateway](ModuleFiveTransit.md)
 
 
 -	*Level*: Beginner - Intermediate
@@ -19,15 +28,3 @@ Prerequisites
 3.	You will incur charges for the AWS resources used in this workshop.   The charges for some of the resources may be covered through the [AWS Free Tier](https://aws.amazon.com/free/).  The demo uses free tier choices wherever possible.
 4.	If you are using an existing account with resources already deployed in a region, be aware of the soft limit of five VPCs per region.
 6.	You can run this workshop in any region. In our example we are using the *eu-west-1* region.
-
-
-Modules
-=======
-
-The workshop is broken up into the five modules below:
-
-1.	[Core AWS Networking](ModuleOneCore.md)
-2.	[Elastic Load Balancers](ModuleTwoELB.md)
-3.	[VPN Gateway](ModuleThreeVPN.md)
-4.	[VPC Peering](ModuleFourPeering.md)
-5.	[TransitGateway](ModuleFiveTransit.md)
