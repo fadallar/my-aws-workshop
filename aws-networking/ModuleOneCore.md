@@ -61,11 +61,11 @@ It connects your VPC Subnets to the Internet.
 
 You can create the internet gateway through **Internet Gateways > Create Internet Gateway**
 
-![](./images/createInternetGateway.png)
+![](./images/createinternetgateway.png)
 
 The internet gateway should then be attached to your VPC
 
-![](./images/attachIGW.png)
+![](./images/attachigw.png)
 
 Creating and attaching an Internet Gateway to our VPC is not enough to get internet traffic flowing from and to your VPC, for that we need to modify our routing and this is the topic of of the route table section.
 
