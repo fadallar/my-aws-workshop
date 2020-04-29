@@ -67,14 +67,14 @@ The internet gateway should then be attached to your VPC
 
 ![](./images/attachIGW.png)
 
-Creating and attaching an Internet Gateway to our VPC is not enough to get internet traffic flowing from an to our VPC, for that we need to modify our routing and this is the topic of the nexxt Section.
+Creating and attaching an Internet Gateway to our VPC is not enough to get internet traffic flowing from and to your VPC, for that we need to modify our routing and this is the topic of of the route table section.
 
 ## NAT Gateway
 
 A NAT Gateway is an AWS Managed resource which enable outbound connection to the internet and prevents the instances from receiving inbound traffic initiated by someone on the internet.
 A NAT Gateway is highly available within an Availability Zone. 
 
-In this set-up we will create an AZ independent architecture and we will create one NAT Gateway per AZ and we will later configure our subnet route tables such that resources use the NAT gateway in the same AZ. 
+In this set-up we will create an AZ independent architecture and we will create one NAT Gateway per AZ.We will later configure our subnet route tables such that resources use the NAT gateway in the same AZ. 
 
 Two NAT Gateway will be created and each will be associated to a different PublicSubnet
 
@@ -83,7 +83,7 @@ Two NAT Gateway will be created and each will be associated to a different Publi
 
 ## Route Table
 
-Each subnet within a VPC contains a logical constrcut called an implicit router. The implicit router is the next hop gateway on a subnet where routing decisions are made.  These routing decisions are governed by a route table, which include a set of route entries.
+Each subnet within a VPC contains a logical construct called an implicit router. The implicit router is the next hop gateway on a subnet where routing decisions are made.  These routing decisions are governed by a route table, which include a set of route entries.
 
 Select the VPC that you just created, and look at the Summary tab. If you can’t see everything in the pane, you can pull the pane up by dragging on the pane’s top line. 
 
@@ -95,7 +95,7 @@ You are now in the Route Tables dashboard, filtered on the main route table of t
 
 ![](./images/mainroutetable.png)
 
-You can see that there are no explicit subnet associations on this route table. However, since this is the main route table for the VPC, there is one subnet implicitly associated. It’s the Private subnet of the VPC.  What makes a subnet public or private? We can find out by looking at the routes in this table. Click on the Routes tab. 
+You can see that there are no explicit subnet associations on this route table. However, since this is the main route table for the VPC, all subnets are implicitly associated.
 
 In the Routes tab, look at the Target column. You’ll see one local route which every route table has. This ensures that resources within the VPC can talk to each other. This route cannot be modified.
 
@@ -108,11 +108,12 @@ In this lab we will create three additional custom route tables and associate th
 |PrivateRouteTable-1b|PrivateSubnetTwo|
 
 ![](./images/createroutetable.png)
-
-Each new route table created has an entry for the defined VPC CIDR range and we will add specific default routes to each one.  
+ 
 
 ![](./images/subnetassociation.png)
 
+
+Each new route table created has an entry for the defined VPC CIDR range and we will add specific default routes to each one.
 
 |Custom route table name|route entry | next hop|
 |---|---|---|
@@ -122,10 +123,12 @@ Each new route table created has an entry for the defined VPC CIDR range and we 
 
 ## Security Group
 
-A Security Group is a stateful virtual firewall that controls inbound and outbound netwrok traffic to AWS Resources and Amazon EC2 Instances. All EC2 Instances are launched with a security group.
+A Security Group is a stateful virtual firewall that controls inbound and outbound network traffic to AWS Resources and Amazon EC2 Instances. All EC2 Instances are launched with a security group.
 By default when you create a new security group no inbound traffic is allowed, until you add an inbound security rule, and an outbound rule is added that allows all outbound traffic
 
-In this workshop we will create security groups for an hypothecial workload comprised of an HTTP LoadBalancer, Web Frontend, and a MySQL Database. We will also be planning for a Linux Bastion Host. 
+In this workshop we will create security groups for an hypothecial workload comprised of an HTTP LoadBalancer, Web Frontend, and a MySQL Database. We will also be planning for a Linux Bastion Host.
+
+It is important to note that these Security Groups are solely used for the demo puporse and do not represent Best Practices !!!.
 
 The security groups will be configured as such 
 
@@ -138,8 +141,10 @@ Security Group Name: LoadBalancerSG
 Security Group Name: BastionSG
 |Direction|Port/Protocol|Src/Dest|
 |---|---|---|
-|Inbound|22/TCP(SSH)|CustomMyIP|
+|Inbound|22/TCP(SSH)|MyIP*|
 |Outbound|22/TCP(SSH)|10.0.0.0/16|
+
+\* The setting MyIP will add the IP address you are using to connect to the AWS Console 
 
 Security Group Name: WebServerSG
 |Direction|Port/Protocol|Src/Dest|
@@ -156,39 +161,38 @@ Security Group Name: DatabaseSG
 |Outbound|AllTraffic|AllTraffic|
 
 
-Configuration Steps
+Security Group Configuration Steps
 
-Create the security group 
+1) Create the security group 
 
 ![](./images/createsecuritygroup.png)
 
-Edit the inbound rules 
+2) Edit the inbound rules 
 
 ![](./images/editinboundrule.png)
 
 
-Edit the outbound rules
+3) Edit the outbound rules (If required)
 
 ![](./images/editoutboundrule.png)
 
 
-Edit the Name Tag 
+4) Edit the Name Tag 
 
 ![](./images/edittag.png)
 
 
 ## VPC Endpoints
-
 A VPC endpoint enables you to connect your VPC privately to supported AWS services and VPC endpoint services without requiring an Internet Gateway or a NAT Gateway.  
 There are two types of VPC Endpoints: Interface and Gateway.  
-* Interface endpoints use an elastic network interface in your VPC with a private IP address that servers as an entry point for traffic destined to a suppported service. 
+* Interface endpoints use an elastic network interface in your VPC with a private IP address that serves as an entry point for traffic destined to a suppported service. 
 * Gateway endpoints use a route table target for a specified route in your route table for supported services. These services are currently Amazon S3 and DynamoDB.
 
-We will create a gateway VPC Endpoints for the S3 Service 
+In this lab we will create a gateway VPC Endpoints for the S3 Service 
 
 ![](./images/createvpcendpoint.png)
 
-And associate it with your Private Route tables and subnet only
+And associate it with your Private Route tables and Private subnet only
 
 ![](./images/createvpcendpointtwo.png)
 
