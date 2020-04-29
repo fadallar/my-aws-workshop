@@ -20,7 +20,7 @@ In this lab we will configure an Application Load Balancer which will be used to
 
 The following figure describes the ALB architecture
 
-![](./images/albarchitecture.png)
+![](./images/elbarchitecture.png)
 
 
 ## ALB Configuration Steps
