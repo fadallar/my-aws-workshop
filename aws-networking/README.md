@@ -28,3 +28,14 @@ Prerequisites
 3.	You will incur charges for the AWS resources used in this workshop.   The charges for some of the resources may be covered through the [AWS Free Tier](https://aws.amazon.com/free/).  The demo uses free tier choices wherever possible.
 4.	If you are using an existing account with resources already deployed in a region, be aware of the soft limit of five VPCs per region.
 6.	You can run this workshop in any region. In our example we are using the *eu-west-1* region.
+
+CloudFormation Templates
+========================
+
+Each Module comes with one or multiple Cloudformation templates which can be used to quickly build or rebuild the lab environment.
+
+1. [Module One - Core Networking Template](./cloudformation/module-one-core.yml)
+2. [Module One - Security groups Template](./cloudformation/module-one-security-group.yml)  
+This module rely on the Core Networking Templates.  
+3. [Module Two - Load Balancer Template](./cloudformation/module-two-elb.yml)
+This module rely on the Core Networking and the security group templates.
