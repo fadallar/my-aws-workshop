@@ -1,0 +1,78 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: "This Template deploys an Application Load Balancer with a basic listener on port 80 and a TargetGroup also using HTTP on port 80 "
+Parameters:
+  NetworkStackName:
+    Description: "Name of an active CloudFormation stack that contains the networking resources that will be used in this stack."
+    Type: "String"
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: "^[a-zA-Z][-a-zA-Z0-9]*$"
+    Default: "CoreNetwork"
+  SecurityGroupStackName:
+    Description: "Name of an active CloudFormation stack that contains the Security Group used in this stack."
+    Type: "String"
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: "^[a-zA-Z][-a-zA-Z0-9]*$"
+    Default: "SecurityGroups"
+  LoadBalancerName:
+    Description: "LoadBalancer Name"
+    Type: "String"
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: "^[a-zA-Z][-a-zA-Z0-9]*$"
+    Default: "MyLoadBalancer"
+  TargetGroupName:
+    Description: "Target Group Name"
+    Type: "String"
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: "^[a-zA-Z][-a-zA-Z0-9]*$"
+    Default: "MyTargetGroup"
+Resources:
+  albloadbalancer:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties: 
+      IpAddressType: "ipv4"
+      Name: !Ref LoadBalancerName
+      Scheme: "internet-facing"
+      SecurityGroups:
+        - {'Fn::ImportValue': !Sub  '${SecurityGroupStackName}:LoadBalancerSecurityGroup'}
+      Subnets: 
+        - {'Fn::ImportValue': !Sub  '${NetworkStackName}:PublicSubnetOne'}
+        - {'Fn::ImportValue': !Sub  '${NetworkStackName}:PublicSubnetTwo'}
+      Type: "application"
+  albtargetgroup:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties: 
+      HealthCheckEnabled: true
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: "/"
+      HealthCheckPort: "traffic-port"
+      HealthCheckProtocol: "HTTP"
+      HealthCheckTimeoutSeconds: 6
+      HealthyThresholdCount: 3
+      Name: !Ref TargetGroupName
+      Port: 80
+      Protocol: "HTTP"
+      UnhealthyThresholdCount: 3
+      VpcId: {'Fn::ImportValue': !Sub  '${NetworkStackName}:VPCId'}
+      TargetType: "ip"
+      Matcher:
+          HttpCode: "200-399"
+  albhttplistener:
+    Type: 'AWS::ElasticLoadBalancingV2::Listener'
+    DependsOn: ["albloadbalancer","albtargetgroup"]
+    Properties:
+      DefaultActions:
+      - TargetGroupArn: !Ref albtargetgroup
+        Type: 'forward'
+      LoadBalancerArn: !Ref albloadbalancer
+      Port: 80
+      Protocol: "HTTP"
+Outputs:
+  LoadBalancerDNSNAme:
+    Description: "DNS Entry for the LoadBalancer"
+    Value: !GetAtt 'albloadbalancer.DNSName'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'LoadBalancerDNSName' ] ]

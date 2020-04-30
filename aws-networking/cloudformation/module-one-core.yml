@@ -1,0 +1,314 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This stack deploys the core network infrastructure used in the Module One
+Parameters:
+  VPCName:
+    Type: "String"
+    Default: "myVPC"
+  PublicSubnetOneName:
+    Type: "String"
+    Default: "PublicSubnetOne"
+  PublicSubnetTwoName:
+    Type: "String"
+    Default: "PublicSubnetTwo"
+  PrivateSubnetOneName:
+    Type: "String"
+    Default: "PrivateSubnetOne"
+  PrivateSubnetTwoName:
+    Type: "String"
+    Default: "PrivateSubnetTwo"
+  LogGroupName:
+    Type: "String"
+    Default: "MyVPCFlowLog"
+Mappings:
+  # Hard coded values for the subnet Ranges. These ranges define
+  # the range of internal IP addresses that can be assigned.
+  # The VPC can have all IP's from 10.0.0.0 to 10.0.255.255
+  # There are four subnets which cover the ranges:
+  #
+  # 10.0.0.0 - 10.0.0.255
+  # 10.0.1.0 - 10.0.1.255
+  # 10.0.128.0 - 10.0.128.255
+  # 10.0.129.0 - 10.0.129.255
+  #
+  SubnetConfig:
+    VPC:
+      CIDR: '10.0.0.0/16'
+    PublicOne:
+      CIDR: '10.0.0.0/24'
+    PublicTwo:
+      CIDR: '10.0.1.0/24'
+    PrivateOne:
+      CIDR: '10.0.128.0/24'
+    PrivateTwo:
+      CIDR: '10.0.129.0/24'
+Resources:
+  # Basic VPC template with Internet Access and NAT Gateways
+  # It has two public subnets, and two private subnets.
+  # We distribute the subnets across the first two available AZ
+  # for the region, for high availability.
+  # one Public Route Table with a default route to an IGW and Two Private Route Tables with default route One NAT Gateway each
+  # Flow Logs is enabled at VPC Level and sent to specific CloudWatchLogGroups
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      CidrBlock: !FindInMap ['SubnetConfig', 'VPC', 'CIDR']
+      Tags:
+        -
+          Key: "Name"
+          Value: !Ref VPCName
+# Two public subnets, where a public load balancer will later be created.
+  PublicSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 0
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicOne', 'CIDR']
+      MapPublicIpOnLaunch: true
+      Tags:
+        -
+          Key: "Name"
+          Value: !Ref PublicSubnetOneName
+  PublicSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 1
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PublicTwo', 'CIDR']
+      MapPublicIpOnLaunch: true
+      Tags:
+        -
+          Key: "Name"
+          Value: !Ref PublicSubnetTwoName
+
+# Two private subnets
+  PrivateSubnetOne:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 0
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateOne', 'CIDR']
+      Tags:
+        -
+          Key: "Name"
+          Value: !Ref PrivateSubnetOneName
+  PrivateSubnetTwo:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone:
+         Fn::Select:
+         - 1
+         - Fn::GetAZs: {Ref: 'AWS::Region'}
+      VpcId: !Ref 'VPC'
+      CidrBlock: !FindInMap ['SubnetConfig', 'PrivateTwo', 'CIDR']
+      Tags:
+        -
+          Key: "Name"
+          Value: !Ref PrivateSubnetTwoName
+
+# Setup networking resources for the public subnets.
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        -
+          Key: "Name"
+          Value: "MyInternetGateway"
+  GatewayAttachement:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref 'VPC'
+      InternetGatewayId: !Ref 'InternetGateway'
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+      Tags:
+        -
+          Key: "Name"
+          Value: "PublicRouteTable"
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: GatewayAttachement
+    Properties:
+      RouteTableId: !Ref 'PublicRouteTable'
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref 'InternetGateway'
+  PublicSubnetOneRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetOne
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetTwoRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetTwo
+      RouteTableId: !Ref PublicRouteTable
+
+# Setup networking resources for the private subnets. Instances
+# in these subnets only have private IP addresses, and must use a NAT
+# gateway to talk to the internet. We launch two NAT gateways, one for
+# each private subnet.
+  NatGatewayOneAttachment:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachement
+    Properties:
+        Domain: vpc
+  NatGatewayTwoAttachment:
+    Type: AWS::EC2::EIP
+    DependsOn: GatewayAttachement
+    Properties:
+        Domain: vpc
+  NatGatewayOne:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayOneAttachment.AllocationId
+      SubnetId: !Ref PublicSubnetOne
+      Tags:
+        -
+          Key: "Name"
+          Value: "MB3-NatGatewayOne"
+  NatGatewayTwo:
+    Type: AWS::EC2::NatGateway
+    Properties:
+      AllocationId: !GetAtt NatGatewayTwoAttachment.AllocationId
+      SubnetId: !Ref PublicSubnetTwo
+      Tags:
+        -
+          Key: "Name"
+          Value: "MB3-NatGatewayTwo"
+  PrivateRouteTableOne:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+      Tags:
+        -
+          Key: "Name"
+          Value: "PrivateRouteTableOne"
+  PrivateRouteOne:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableOne
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayOne
+  PrivateRouteTableOneAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableOne
+      SubnetId: !Ref PrivateSubnetOne
+  PrivateRouteTableTwo:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref 'VPC'
+      Tags:
+        -
+          Key: "Name"
+          Value: "PrivateRouteTableTwo"
+  PrivateRouteTwo:
+    Type: AWS::EC2::Route
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableTwo
+      DestinationCidrBlock: 0.0.0.0/0
+      NatGatewayId: !Ref NatGatewayTwo
+  PrivateRouteTableTwoAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref PrivateRouteTableTwo
+      SubnetId: !Ref PrivateSubnetTwo
+
+# Set-Up FLowLog at VPC Level as well as the  CloudWatch Log Group and associated Role
+  CloudWatchLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties: 
+      LogGroupName: !Ref LogGroupName
+      RetentionInDays: 7
+
+  VPCFlowLog:
+    Type: AWS::EC2::FlowLog
+    Properties: 
+      DeliverLogsPermissionArn: !GetAtt FlowLogRole.Arn
+      LogGroupName: !Ref LogGroupName
+      ResourceId: !Ref VPC
+      ResourceType: "VPC"
+      TrafficType: "ALL"
+
+  FlowLogRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - vpc-flow-logs.amazonaws.com
+          Action:
+          - sts:AssumeRole
+      Path: /
+      Policies:
+      - PolicyName: flowlogrole
+        PolicyDocument:
+          Statement:
+          - Effect: Allow
+            Action:
+              - 'iam:PassRole'
+              # Rules which allow publishing flow logs to cloudwatch logs
+              - 'logs:DescribeLogStreams'
+              - 'logs:CreateLogStream'
+              - 'logs:CreateLogGroup'
+              - 'logs:PutLogEvents'
+            Resource: !GetAtt CloudWatchLogGroup.Arn
+  
+# These are the values output by the CloudFormation template. Be careful
+# about changing there names as they are exported and referenced by other templates
+Outputs:
+  CurrentRegion:
+    Description: Region
+    Value: !Ref AWS::Region
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'CurrentRegion' ] ]
+  CurrentAccount:
+    Description: AccountId
+    Value: !Ref AWS::AccountId
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'CurrentAccount' ] ]
+  VPCId:
+    Description: VPC_ID
+    Value: !Ref 'VPC'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'VPCId' ] ]
+  VPCCidr:
+    Description: "VPC IPV4 CIDR Block"
+    Value: !GetAtt VPC.CidrBlock
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'VPCCidr' ] ]
+  PublicSubnetOne:
+    Description: PUBLIC_SUBNET_ONE
+    Value: !Ref 'PublicSubnetOne'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PublicSubnetOne' ] ]
+  PublicSubnetTwo:
+    Description: PUBLIC_SUBNET_TWO
+    Value: !Ref 'PublicSubnetTwo'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PublicSubnetTwo' ] ]
+  PrivateSubnetOne:
+    Description: PRIVATE_SUBNET_ONE
+    Value: !Ref 'PrivateSubnetOne'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PrivateSubnetOne' ] ]
+  PrivateSubnetTwo:
+    Description: PRIVATE_SUBNET_TWO
+    Value: !Ref 'PrivateSubnetTwo'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'PrivateSubnetTwo' ] ]

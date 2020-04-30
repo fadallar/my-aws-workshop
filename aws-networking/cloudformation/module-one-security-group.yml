@@ -1,0 +1,102 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: This stack deploys the Security Groups defined in the AWS Networking Module One 
+Parameters:
+  NetworkStackName:
+    Description: "Name of an active CloudFormation stack that contains the networking resources, such as VPCId and VPC Cidr Block which will be used in this stack."
+    Type: "String"
+    MinLength: 1
+    MaxLength: 255
+    AllowedPattern: "^[a-zA-Z][-a-zA-Z0-9]*$"
+    Default: "CoreNetwork"
+Resources:
+  LoadBalancerSG:
+    Type: "AWS::EC2::SecurityGroup"
+    Properties:
+      GroupName: "LoadBalancerSG"
+      GroupDescription: "Opens HTTP for Load Balancer to the Internet"
+      VpcId: {'Fn::ImportValue': !Sub  '${NetworkStackName}:VPCId'}
+      SecurityGroupIngress:
+        IpProtocol: "tcp"
+        FromPort: 80
+        ToPort: 80
+        CidrIp: "0.0.0.0/0"
+  WebServerSG:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: ["BastionSG" , "LoadBalancerSG"]
+    Properties:
+      GroupName: "WebServerSG"
+      GroupDescription: "Opens HTTP for Web Servers to Load Balancer"
+      VpcId: {'Fn::ImportValue': !Sub  '${NetworkStackName}:VPCId'}
+      SecurityGroupIngress:
+        -
+          IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: { "Ref" : "LoadBalancerSG" }
+        -
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: {"Ref" : "BastionSG" }
+  BastionSG:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: "BastionSG"
+      GroupDescription: "Opens SSH port inbound and outbound"
+      VpcId: {'Fn::ImportValue': !Sub  '${NetworkStackName}:VPCId'}
+      SecurityGroupIngress:
+        -
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: "0.0.0.0/0"
+      SecurityGroupEgress:
+        IpProtocol: "tcp"
+        FromPort: 22
+        ToPort: 22
+        CidrIp: {'Fn::ImportValue': !Sub  '${NetworkStackName}:VPCCidr'}
+  DatabaseSG:
+    Type: AWS::EC2::SecurityGroup
+    DependsOn: [ "BastionSG" , "WebServerSG" ]
+    Properties:
+      GroupName: "DatabaseSG"
+      GroupDescription: "Opens mysql (3306) port for Database Servers to Web Servers and SSH port from Bastion Host"
+      VpcId: {'Fn::ImportValue': !Sub  '${NetworkStackName}:VPCId'}
+      SecurityGroupIngress:
+        -
+          IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          SourceSecurityGroupId: {"Ref" : "BastionSG" }
+        -
+          IpProtocol: tcp
+          FromPort: 3306
+          ToPort: 3306
+          SourceSecurityGroupId: {"Ref" : "WebServerSG" }
+  LoadbalancerSGEgress:
+    Type: AWS::EC2::SecurityGroupEgress
+    DependsOn: ["WebServerSG" , "LoadBalancerSG"]
+    Properties:
+      IpProtocol: tcp
+      FromPort: 80
+      ToPort: 80
+      DestinationSecurityGroupId: {"Ref" : "WebServerSG"}
+      GroupId: {"Ref" : "LoadBalancerSG"}
+Outputs:
+  WebServerSecurityGroup:
+    Value: !Ref 'WebServerSG'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'WebServerSecurityGroup' ] ]
+  LoadBalancerSecurityGroup:
+    Value: !Ref 'LoadBalancerSG'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'LoadBalancerSecurityGroup' ] ]
+  BastionSecurityGroup:
+    Value: !Ref 'BastionSG'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'BastionSecurityGroup' ] ]
+  DatabaseSecurityGroup:
+    Value: !Ref 'DatabaseSG'
+    Export:
+      Name: !Join [ ':', [ !Ref 'AWS::StackName', 'DatabaseSecurityGroup' ] ]
